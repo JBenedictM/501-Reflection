@@ -11,6 +11,12 @@ import java.lang.reflect.Modifier;
  */
 public class Inspector {
 	
+	/**
+	 * Prints out fairly detailed Class information on the specified Object
+	 * 
+	 * @param obj : instance of an object to be examined
+	 * @param recursive : determines whether to recursively inspect the Fields of the object 
+	 */
 	public void inspect(Object obj, boolean recursive) {
 		
 		inspect_with_tab_level(obj, obj.getClass(), recursive, 0);
