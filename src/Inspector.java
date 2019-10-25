@@ -12,15 +12,44 @@ public class Inspector {
 			
 	}
 	
-	private void inspect_with_tab_level(Object obj, Class obj_class, boolean recursive, int tab_level) {
+	private void inspect_with_tab_level_boring(Object obj, Class obj_class, boolean recursive, int tab_level) {
 		
-		// Base case we have reached past the Object Class
-		if (obj == null || obj_class == null) {
+		// Base case: we have reached past the Object Class
+		if (obj == null) {
 			return;
 		}
 		
-				
+		// indentation for our current recursion level
 		String indent = new String(new char[tab_level]).replace("\0", "\t");
+		
+		// print class name
+		System.out.println(indent + "Class name: " + obj_class.getName() + "\n");
+		
+		// recurse on super class
+		Class superclass = obj_class.getSuperclass();
+		if (superclass != null) {
+			inspect_with_tab_level_boring(obj, superclass, recursive, tab_level+1);
+		} else {
+			System.out.println(indent + "None\n");
+		}
+		
+		
+	}
+	
+	private String boring_inspect(Object obj, Class obj_class) {
+		StringBuilder sb = new StringBuilder();
+	}
+	
+	private void inspect_with_tab_level(Object obj, Class obj_class, boolean recursive, int tab_level) {
+		
+		// Base case: we have reached past the Object Class
+		if (obj == null) {
+			return;
+		}
+		
+		// indentation for our current recursion level
+		String indent = new String(new char[tab_level]).replace("\0", "\t");
+		
 		// print class name
 		System.out.println(indent + "Class name: " + obj_class.getName() + "\n");
 				
@@ -86,6 +115,58 @@ public class Inspector {
 		} 
 		
 	}	
+	
+	
+	private String get_field_info(Object obj, Field aField) {
+		StringBuilder sb = new StringBuilder();
+		
+		if (!aField.isAccessible()) {
+			aField.setAccessible(true);
+		}
+		
+		// print name
+		String field_name = aField.getName();
+		sb.append(String.format("Field Name: %s\n", field_name));
+					
+		// print type
+		Class field_type = aField.getType();
+		sb.append(String.format("Field Type : %s\n", field_type.getTypeName()));
+		
+		// print modifiers
+		String field_modifiers = get_modifiers(aField);
+		sb.append(String.format("Field Modifiers: %s\n", field_modifiers));
+						
+		// print current value
+		String error_string = null;
+		Object field_value = null;
+		
+		try {
+			field_value = aField.get(obj);
+			
+		} catch (IllegalAccessException iae) {
+			error_string = "IllegalAccessException thrown";
+		
+		} catch (IllegalArgumentException iae) {
+			error_string = "IllegalArgumentException thrown";
+			
+		} catch (NullPointerException npe) {
+			error_string = "NullPointerException thrown";
+		}
+		
+		if (field_value != null) {
+			// create string of object with address or simply show the primitive value
+			if (!field_type.isPrimitive()) {
+				sb.append(String.format("Current Value: %s\n\n", field_value.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(field_value))));
+			} else {
+				sb.append(String.format("Current Value: %s\n\n", field_value));
+			}
+		} else {
+			// failed to obtain value therefore report exception
+			sb.append(String.format("Current Value: %s\n\n", error_string));	
+		}
+			
+		return sb.toString();
+	}
 	
 	
 	private String get_field_info(Object obj, Class obj_class, boolean recursive, int tab_level) {
@@ -175,22 +256,16 @@ public class Inspector {
 		
 		for (Constructor aConstructor : class_constructors) {
 			// set accessible if constructor is not accessible
-			if (!aConstructor.isAccessible()) {
-//				try {
-					aConstructor.setAccessible(true);
-//				} catch (SecurityException se) {
-//					// ignore
-//					// exception is most likely due to Class class being accessed
-//					continue;
-//				}
+			if (!aConstructor.isAccessible()) {	
+				aConstructor.setAccessible(true);
 			}
 			
-			// print name
+			// print constructor name
 			String construc_name = aConstructor.getName();
 			sb.append(String.format("Constructor Name: %s\n",  construc_name));
 						
 			// print parameter types
-			String parameter_types = get_constructor_parameters(aConstructor);
+			String parameter_types = classArrayToString(aConstructor.getParameterTypes(), ", ");
 		
 			sb.append(String.format("Parameter Types: %s\n", parameter_types));
 			
@@ -214,7 +289,7 @@ public class Inspector {
 				aMethod.setAccessible(true);
 			}
 			
-			// print name
+			// print method name
 			String method_name = aMethod.getName();
 			sb.append(String.format("Method Name: %s\n",  method_name));
 			
@@ -252,7 +327,13 @@ public class Inspector {
 		return sb.toString();
 	}
 	
-	private String classArrayToString(Class[] class_array, String separator) {
+	/**
+	 * 
+	 * @param class_array : array of Class objects
+	 * @param separator : separator string used to divide the the Class objects
+	 * @return : string output looks like: Class.name1 "seperator" Class.name2 "separator" .... Class.nameN
+	 */
+	public static String classArrayToString(Class[] class_array, String separator) {
 		StringBuilder sb = new StringBuilder();
 		
 		if (class_array.length > 0) {
@@ -268,26 +349,6 @@ public class Inspector {
 		return sb.toString();
 	}
 	
-	/**
-	 * 
-	 * @param class_obj : object representing a Class, Constructor
-	 * @return : returns a string of paramters like: "param1, param2,...., paramN"
-	 * 
-	 */
-	private String get_constructor_parameters(Constructor constructor_obj) {
-		StringBuffer param_buff = new StringBuffer();
-		Class[] parameters = constructor_obj.getParameterTypes();
-		
-		if (parameters.length > 0) {
-			param_buff.append(parameters[0].getTypeName());
-			
-			for (int i=1; i<parameters.length; i++) {
-				param_buff.append(", " + parameters[i].getTypeName());
-			}
-		}
-		
-		return param_buff.toString();
-	}
 	
 	/**
 	 * 
@@ -295,10 +356,10 @@ public class Inspector {
 	 * @return : modifiers in string like so "modifier1, modifier2, ..., modifierN"
 	 * 
 	 */
-	private String get_modifiers(Object class_obj) {
+	public static String get_modifiers(Object obj) {
 		StringBuffer modifiers =  new StringBuffer();
-		
-		int construc_modifier = class_obj.getClass().getModifiers();
+
+		int construc_modifier = obj.getClass().getModifiers();
 		
 		if (Modifier.isPublic(construc_modifier))
 			modifiers.append("public, ");
@@ -345,16 +406,4 @@ public class Inspector {
 		return modifiers.toString();
 	}
 	
-	
-//	public static void main(String[] args) {
-//		Inspector ins = new Inspector();
-//		String[] temp = {"hello", "world", "bye"};
-//		char[][] sample2 = {{'a', 'b'}, {'c', 'd'}};
-//		String sample3 = "hi";
-//		int sample4 = 123;
-//		
-//		ins.inspect(sample3, false);
-//		
-//		
-//	}
 }
