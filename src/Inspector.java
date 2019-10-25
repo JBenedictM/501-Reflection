@@ -36,10 +36,11 @@ public class Inspector {
 		String indent = new String(new char[tab_level]).replace("\0", "\t");
 		
 		// print class name
-		System.out.print(indent + "Class name: " + obj_class.getName() + "\n\n");
+		String class_name = obj_class.getName();
+		System.out.print(indent + "Class name: " + class_name + "\n\n");
 		
 		// recurse on super class
-		System.out.println(indent + "Super-Class");
+		System.out.println(indent + "Super-Class (" + class_name + ")");
 		Class superclass = obj_class.getSuperclass();
 		if (superclass != null) {
 			inspect_with_tab_level(obj, superclass, recursive, tab_level+1);
@@ -48,7 +49,7 @@ public class Inspector {
 		}
 		
 		// recurse on interfaces
-		System.out.println(indent + "Interfaces");
+		System.out.println(indent + "Interfaces (" + class_name + ")");
 		Class[] interfaces = obj_class.getInterfaces();
 		if (interfaces.length > 0) {
 			for (Class anInterface : interfaces) {
@@ -66,7 +67,7 @@ public class Inspector {
 		// print out fields
 		// recurse if needed
 		Field[] obj_fields = obj_class.getDeclaredFields();
-		System.out.println(indent + "Fields");
+		System.out.println(indent + "Fields (" + class_name + ")");
 		
 		if (obj_fields.length > 0) {
 			for (Field aField : obj_fields) {
@@ -103,10 +104,9 @@ public class Inspector {
 		}
 		
 		
-		// recurse on arrays
-		// check for array
+		// recurse on arrays if object is an array
 		if (obj_class.isArray()) {
-			System.out.println(indent + "Array Info");
+			System.out.println(indent + "Array Info (" + class_name + ")");
 			String array_info = get_array_info(obj);
 			array_info = array_info.replaceAll("(?m)^", indent); 		// adds in the indentation
 			System.out.print(array_info);
@@ -114,7 +114,7 @@ public class Inspector {
 			// loop through the array
 			for (int i=0; i<Array.getLength(obj); i++) {
 				Object array_obj = Array.get(obj, i);
-				System.out.printf(indent + "\t" + "Object at index: %d\n", i);
+				System.out.printf(indent + "\t" + "Object at index: %d (%s)\n", i, class_name);
 				if (array_obj != null) {
 					inspect_with_tab_level(array_obj, array_obj.getClass(), recursive, tab_level+1);
 				} else {
@@ -131,10 +131,11 @@ public class Inspector {
 	 * @return outputs String containing info about the Class' constructors and methods
 	 */
 	public static String basic_inspect(Object obj, Class obj_class) {
+		String class_name = obj_class.getName();
 		StringBuilder sb = new StringBuilder();
 		
 		// insert constructors 
-		sb.append("Constructors\n");
+		sb.append("Constructors (" + class_name + ")\n");
 		String constructors_info = get_constructors_info(obj_class);
 		if (!constructors_info.isEmpty()) {
 			sb.append(constructors_info);
@@ -143,7 +144,7 @@ public class Inspector {
 		}
 		
 		// insert methods 
-		sb.append("Methods\n");
+		sb.append("Methods (" + class_name + ")\n");
 		String methods_info = get_declared_methods_info(obj_class);
 		if (!methods_info.isEmpty()) {
 			sb.append(methods_info);
@@ -372,7 +373,6 @@ public class Inspector {
 		
 		StringBuffer modifiers_sb =  new StringBuffer();
 		
-		
 		if (Modifier.isPublic(modifiers))
 			modifiers_sb.append("public, ");
 		
@@ -417,5 +417,4 @@ public class Inspector {
 		
 		return modifiers_sb.toString();
 	}
-	
 }
