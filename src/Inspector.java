@@ -6,26 +6,19 @@ import java.lang.reflect.Modifier;
 
 public class Inspector {
 	
-	// tells recursion calls how many tabs they should use
-	private int tab_level = 0;
 	public void inspect(Object obj, boolean recursive) {
 		
-		inspect_with_tab_level(obj, recursive, 0);
+		inspect_with_tab_level(obj, obj.getClass(), recursive, 0);
 			
 	}
 	
-	private void inspect_with_tab_level(Object obj, boolean recursive, int tab_level) {
+	private void inspect_with_tab_level(Object obj, Class obj_class, boolean recursive, int tab_level) {
+		
 		// Base case we have reached past the Object Class
-		if (obj == null) {
+		if (obj == null || obj_class == null) {
 			return;
 		}
-				
-		Class obj_class = null;
-		if (obj instanceof Class) {
-			obj_class = (Class)obj;
-		} else {
-			obj_class = obj.getClass();
-		}
+		
 				
 		String indent = new String(new char[tab_level]).replace("\0", "\t");
 		// print class name
@@ -34,67 +27,74 @@ public class Inspector {
 		// recurse on super class
 		Class superclass = obj_class.getSuperclass();
 		System.out.println(indent + "Super-Class");
-		inspect_with_tab_level(superclass, recursive, tab_level++);
+		if (superclass != null) {
+			inspect_with_tab_level(obj, superclass, recursive, tab_level+1);
+		} else {
+			System.out.println(indent + "None\n");
+		}
 		
 		// recurse on interfaces
 		System.out.println(indent + "Interfaces");
 		Class[] interfaces = obj_class.getInterfaces();
-		for (Class anInterface : interfaces) {
-			inspect_with_tab_level(anInterface, recursive, tab_level++);
+		if (interfaces.length > 0) {
+			for (Class anInterface : interfaces) {
+				inspect_with_tab_level(anInterface, anInterface, recursive, tab_level+1);
+			}	
+		} else {
+			System.out.println(indent + "None\n");
 		}
-
-				
-		// print constructors
+		
+		// print constructors 
 		System.out.println(indent + "Constructors");
-		display_constructors(obj_class);
+		String constructors_info = get_constructors_info(obj_class);
+		if (!constructors_info.isEmpty()) {
+			constructors_info = constructors_info.replaceAll("(?m)^", indent); 		// adds in the indentation
+			System.out.print(constructors_info);
+		} else {
+			System.out.println(indent + "None\n");
+		}
 		
-		// print methods
+		
+		// print methods 
 		System.out.println(indent + "Methods");
-		display_declared_methods(obj_class);
+		String methods_info = get_declared_methods_info(obj_class);
+		if (!methods_info.isEmpty()) {
+			methods_info = methods_info.replaceAll("(?m)^", indent);				// adds in the indentation
+			System.out.print(methods_info);
+		} else {
+			System.out.println(indent + "None\n");
+		}
 		
-		// print fields
+		// print fields 
 		System.out.println(indent + "Fields");
-		display_fields(obj, recursive);
+		String field_info = get_field_info(obj, obj_class, recursive, tab_level);
+		
 		
 		// check for array
 		if (obj_class.isArray()) {
+			System.out.println(indent + "Array Contents");
 			// loop through the array
 			for (int i=0; i<Array.getLength(obj); i++) {
 				Object array_obj = Array.get(obj, i);
-				inspect_with_tab_level(array_obj, recursive, tab_level++);
+				System.out.printf(indent + "\t" + "Object at index: %d\n", i);
+				if (array_obj != null) {
+					inspect_with_tab_level(array_obj, array_obj.getClass(), recursive, tab_level+1);
+				} else {
+					System.out.printf(indent + "\t" + "null\n\n");
+				}
 			}
 		} 
+		
 	}	
-		
-	
-	private String display_interfaces(Class[] interfaces, boolean recursive) {
-		if (interfaces.length == 0) 
-			return "";
-		
-		
-		StringBuffer interfaces_list = new StringBuffer(classArrayToString(interfaces, ", "));
-		
-		// recursive step
-		for (Class anInterface : interfaces) {
-			String other_interfaces = display_interfaces(anInterface.getInterfaces(), recursive);
-			
-			if (!other_interfaces.isEmpty()) {
-				interfaces_list.append(", ");
-				interfaces_list.append(other_interfaces);
-			}
-		}
-		
-		return interfaces_list.toString();
-		
-		
-	}
 	
 	
-	private void display_fields(Object obj, boolean recursive) {
-		Class class_obj = obj.getClass();
-		Field[] class_fields = class_obj.getDeclaredFields();
+	private String get_field_info(Object obj, Class obj_class, boolean recursive, int tab_level) {
 		
-		for (Field aField : class_fields) {
+		Field[] obj_fields = obj_class.getDeclaredFields();
+		StringBuilder sb = new StringBuilder();
+		
+		String indent = new String(new char[tab_level]).replace("\0", "\t");
+		for (Field aField : obj_fields) {
 			
 			if (!aField.isAccessible()) {
 				aField.setAccessible(true);
@@ -102,69 +102,111 @@ public class Inspector {
 			
 			// print name
 			String field_name = aField.getName();
-			System.out.printf("Field Name: %s\n", field_name);
+			sb.append(String.format(indent + "Field Name: %s\n", field_name));
 			
 			// print type
-			String field_type = aField.getType().getTypeName();
-			System.out.printf("Field Type : %s\n", field_type);
-			
+			Class field_type = aField.getType();
+			sb.append(String.format(indent + "Field Type : %s\n", field_type.getTypeName()));
+				
 			// print modifiers
 			String field_modifiers = get_modifiers(aField);
-			System.out.printf("Field Modifiers: %s\n", field_modifiers);
+			sb.append(String.format(indent + "Field Modifiers: %s\n", field_modifiers));
 			
 			// print current value
 			String value = null;
+			Object field_value = null;
+			boolean except_flag = false;
 			try {
-				Object field_value = aField.get(obj);
-				value = field_value.toString();
-
+				field_value = aField.get(obj);
+				
 			} catch (IllegalAccessException iae) {
 				value = "IllegalAccessException thrown";
-
 			} catch (IllegalArgumentException iae) {
 				value = "IllegalArgumentException thrown";
 
 			} catch (NullPointerException npe) {
 				value = "NullPointerException thrown";
-			}
-			System.out.printf("Current Value: %s\n\n", value);
 
+			}
+			if (field_value != null ) {
+				if (!field_type.isPrimitive()) {
+					sb.append(String.format(indent + "Current Value: %s\n", field_value.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(field_value))));
+				} else {
+					sb.append(String.format(indent + "Current Value: %s\n", field_value));
+				}
+			} else {
+				sb.append(String.format(indent + "Current Value: %s\n", value));	
+			}
+			System.out.println(sb.toString());
+			sb = new StringBuilder();
+			
+			// recurse
+			if (recursive  && field_value != null) {
+				
+				if (!field_type.isPrimitive()) {
+					Class field_value_class = null;
+					if (field_value instanceof Class) {
+						field_value_class = (Class)field_value;;
+					} else {
+						field_value_class = field_value.getClass();
+					}
+					inspect_with_tab_level(field_value, field_value_class, recursive, tab_level+1);
+				}
+				
+			}
 			
 		}
+		
+		if (obj_fields.length == 0) {
+			System.out.println(indent + "None\n");
+		}
+		
+
+		return sb.toString();
 	}
 	
 	/**
 	 * prints the constructors of a class obj
 	 * @param class_obj : Class object containing the constructors
 	 */
-	private void display_constructors(Class class_obj) {
+	private String get_constructors_info(Class class_obj) {
 		Constructor[] class_constructors = class_obj.getDeclaredConstructors();
+		StringBuilder sb = new StringBuilder();
 		
 		for (Constructor aConstructor : class_constructors) {
 			// set accessible if constructor is not accessible
 			if (!aConstructor.isAccessible()) {
-				aConstructor.setAccessible(true);
+//				try {
+					aConstructor.setAccessible(true);
+//				} catch (SecurityException se) {
+//					// ignore
+//					// exception is most likely due to Class class being accessed
+//					continue;
+//				}
 			}
 			
 			// print name
 			String construc_name = aConstructor.getName();
-			System.out.printf("Constructor Name: %s\n",  construc_name);
+			sb.append(String.format("Constructor Name: %s\n",  construc_name));
 						
 			// print parameter types
 			String parameter_types = get_constructor_parameters(aConstructor);
 		
-			System.out.printf("Parameter Types: %s\n", parameter_types);
+			sb.append(String.format("Parameter Types: %s\n", parameter_types));
 			
 			// print possible modifiers
 			String modifiers = get_modifiers(aConstructor);
-			System.out.printf("Modifers: %s\n\n", modifiers);
+			sb.append(String.format("Modifers: %s\n\n", modifiers));
 			
 		}
 		
+		return sb.toString();
+		
 	}
 	
-	private void display_declared_methods(Class class_obj) {
+	private String get_declared_methods_info(Class class_obj) {
 		Method[] class_methods = class_obj.getDeclaredMethods();
+		StringBuilder sb = new StringBuilder();
 		
 		for (Method aMethod : class_methods) {
 			// set accessible if method is not accessible
@@ -174,38 +216,40 @@ public class Inspector {
 			
 			// print name
 			String method_name = aMethod.getName();
-			System.out.printf("Method Name: %s\n",  method_name);
+			sb.append(String.format("Method Name: %s\n",  method_name));
 			
 			
 			// print exceptions thrown
 			String exceptions = classArrayToString(aMethod.getExceptionTypes(), ", ");
 			if (exceptions.isEmpty()) {
-				System.out.println("Exceptions Thrown: None");
+				sb.append("Exceptions Thrown: None\n");
 			} else {
-				System.out.printf("Exceptions Thrown: %s\n", exceptions);
+				sb.append(String.format("Exceptions Thrown: %s\n", exceptions));
 			}
 			
 			// print parameter types
 			String parameters = classArrayToString(aMethod.getParameterTypes(), ", ");
 			if (parameters.isEmpty()) {
-				System.out.println("Parameter Types: None");
+				sb.append("Parameter Types: None\n");
 			} else {
-				System.out.printf("Parameter Types: %s\n", parameters);
+				sb.append(String.format("Parameter Types: %s\n", parameters));
 			}
 			
 			// print return types
 			String return_type = aMethod.getReturnType().getTypeName();
 			if (return_type.isEmpty()) {
-				System.out.println("Return Type: Void");
+				sb.append("Return Type: Void\n");
 			} else {
-				System.out.printf("Return Type: %s\n", return_type);
+				sb.append(String.format("Return Type: %s\n", return_type));
 			}
-
+			
 			// print modifiers
 			String modifiers = get_modifiers(aMethod);
-			System.out.printf("Modifiers: %s\n\n", modifiers);
+			sb.append(String.format("Modifiers: %s\n\n", modifiers));
 			
 		}
+		
+		return sb.toString();
 	}
 	
 	private String classArrayToString(Class[] class_array, String separator) {
@@ -302,12 +346,15 @@ public class Inspector {
 	}
 	
 	
-	public static void main(String[] args) {
-		Inspector ins = new Inspector();
-		String[] temp = {"hello", "world", "bye"};
-		
-		ins.inspect(temp, false);
-		
-		
-	}
+//	public static void main(String[] args) {
+//		Inspector ins = new Inspector();
+//		String[] temp = {"hello", "world", "bye"};
+//		char[][] sample2 = {{'a', 'b'}, {'c', 'd'}};
+//		String sample3 = "hi";
+//		int sample4 = 123;
+//		
+//		ins.inspect(sample3, false);
+//		
+//		
+//	}
 }
