@@ -4,6 +4,11 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
+/**
+ * Class Explorer through Reflection
+ * @author Benedict Mendoza
+ *
+ */
 public class Inspector {
 	
 	public void inspect(Object obj, boolean recursive) {
@@ -12,6 +17,14 @@ public class Inspector {
 			
 	}
 	
+	/**
+	 * Underlying function of inspect()
+	 * 
+	 * @param obj : actual object instance
+	 * @param obj_class : Class of the instance
+	 * @param recursive : dictates whether to explore the Class' fields recursively
+	 * @param tab_level : used to maintain how many tabs should be used for the particular recursion
+	 */
 	private void inspect_with_tab_level(Object obj, Class obj_class, boolean recursive, int tab_level) {
 		
 		// Base case: we have reached past the Object Class
@@ -45,7 +58,7 @@ public class Inspector {
 			System.out.print(indent + "None\n\n");
 		}
 		
-		// print out class name, constructors and methods information
+		// print out constructors and methods information
 		String basic_class_info = basic_inspect(obj, obj_class);
 		basic_class_info = basic_class_info.replaceAll("(?m)^", indent); 		// adds in the indentation
 		System.out.print(basic_class_info);
@@ -111,7 +124,13 @@ public class Inspector {
 		} 
 	}
 	
-	private String basic_inspect(Object obj, Class obj_class) {
+	/**
+	 * 
+	 * @param obj : actual object instance
+	 * @param obj_class : Class object of the instance
+	 * @return outputs String containing info about the Class' constructors and methods
+	 */
+	public static String basic_inspect(Object obj, Class obj_class) {
 		StringBuilder sb = new StringBuilder();
 		
 		// insert constructors 
@@ -135,7 +154,12 @@ public class Inspector {
 		return sb.toString();
 	}
 	
-	private String get_array_info(Object array_obj) {
+	/**
+	 * 
+	 * @param array_obj : Array Object
+	 * @return ouput string containing array type and length
+	 */
+	public static String get_array_info(Object array_obj) {
 		
 		// ensure arrray object is an actual array
 		Class array_class = array_obj.getClass();
@@ -153,7 +177,13 @@ public class Inspector {
 	}
 	
 	
-	private String get_field_info(Object obj, Field aField) {
+	/**
+	 * 
+	 * @param obj : actual object instance
+	 * @param aField : field found in the object instance
+	 * @return : output string containing information about the given field
+	 */
+	public static String get_field_info(Object obj, Field aField) {
 		StringBuilder sb = new StringBuilder();
 		
 		if (!aField.isAccessible()) {
@@ -192,7 +222,8 @@ public class Inspector {
 		if (field_value != null) {
 			// create string of object with address or simply show the primitive value
 			if (!field_type.isPrimitive()) {
-				sb.append(String.format("Current Value: %s\n\n", field_value.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(field_value))));
+				String obj_address = Integer.toHexString(System.identityHashCode(field_value));
+				sb.append(String.format("Current Value: %s\n\n", field_value.getClass().getName() + "@" + obj_address));
 			} else {
 				sb.append(String.format("Current Value: %s\n\n", field_value));
 			}
@@ -209,7 +240,7 @@ public class Inspector {
 	 * prints the constructors of a class obj
 	 * @param class_obj : Class object containing the constructors
 	 */
-	private String get_constructors_info(Class class_obj) {
+	public static String get_constructors_info(Class class_obj) {
 		Constructor[] class_constructors = class_obj.getDeclaredConstructors();
 		StringBuilder sb = new StringBuilder();
 		
@@ -240,7 +271,12 @@ public class Inspector {
 		
 	}
 	
-	private String get_declared_methods_info(Class class_obj) {
+	/**
+	 * 
+	 * @param class_obj : Class object
+	 * @return : output String containing declared methods and their respective information
+	 */
+	public static String get_declared_methods_info(Class class_obj) {
 		Method[] class_methods = class_obj.getDeclaredMethods();
 		StringBuilder sb = new StringBuilder();
 		
@@ -313,58 +349,73 @@ public class Inspector {
 	
 	/**
 	 * 
-	 * @param obj : must be of type Class, Constructor
+	 * @param obj : must be of type Method, Constructor, Field
 	 * @return : modifiers in string like so "modifier1, modifier2, ..., modifierN"
 	 * 
 	 */
 	public static String get_modifiers(Object obj) {
-		StringBuffer modifiers =  new StringBuffer();
+		
+		int modifiers = -1;
 
-		int construc_modifier = obj.getClass().getModifiers();
-		
-		if (Modifier.isPublic(construc_modifier))
-			modifiers.append("public, ");
-		
-		if (Modifier.isPrivate(construc_modifier))
-			modifiers.append("private, ");
-		
-		if (Modifier.isProtected(construc_modifier)) 
-			modifiers.append("protected, ");
-		
-		if (Modifier.isStrict(construc_modifier)) 
-			modifiers.append("strict, ");
-		
-		if (Modifier.isStatic(construc_modifier)) 
-			modifiers.append("static, ");
-		
-		if (Modifier.isFinal(construc_modifier)) 
-			modifiers.append("final, ");
-		
-		if (Modifier.isAbstract(construc_modifier)) 
-			modifiers.append("abstract, ");
-		
-		if (Modifier.isInterface(construc_modifier)) 
-			modifiers.append("interface, ");
+		if (obj instanceof Constructor) {
+			modifiers = ((Constructor)obj).getModifiers();
 			
-		if (Modifier.isNative(construc_modifier)) 
-			modifiers.append("native, ");
+		} else if (obj instanceof Method) {
+			modifiers = ((Method)obj).getModifiers();
+			
+		} else if (obj instanceof Field) {
+			modifiers = ((Field)obj).getModifiers();
+			
+		} else {
+			return "None Found";
+		}
 		
-		if (Modifier.isSynchronized(construc_modifier)) 
-			modifiers.append("synchronized, ");
+		StringBuffer modifiers_sb =  new StringBuffer();
 		
-		if (Modifier.isTransient(construc_modifier)) 
-			modifiers.append("transient, ");
 		
-		if (Modifier.isVolatile(construc_modifier)) 
-			modifiers.append("volatile, ");
+		if (Modifier.isPublic(modifiers))
+			modifiers_sb.append("public, ");
+		
+		if (Modifier.isPrivate(modifiers))
+			modifiers_sb.append("private, ");
+		
+		if (Modifier.isProtected(modifiers)) 
+			modifiers_sb.append("protected, ");
+		
+		if (Modifier.isStrict(modifiers)) 
+			modifiers_sb.append("strict, ");
+		
+		if (Modifier.isStatic(modifiers)) 
+			modifiers_sb.append("static, ");
+		
+		if (Modifier.isFinal(modifiers)) 
+			modifiers_sb.append("final, ");
+		
+		if (Modifier.isAbstract(modifiers)) 
+			modifiers_sb.append("abstract, ");
+		
+		if (Modifier.isInterface(modifiers)) 
+			modifiers_sb.append("interface, ");
+			
+		if (Modifier.isNative(modifiers)) 
+			modifiers_sb.append("native, ");
+		
+		if (Modifier.isSynchronized(modifiers)) 
+			modifiers_sb.append("synchronized, ");
+		
+		if (Modifier.isTransient(modifiers)) 
+			modifiers_sb.append("transient, ");
+		
+		if (Modifier.isVolatile(modifiers)) 
+			modifiers_sb.append("volatile, ");
 		
 		// remove the ", " from the string buffer
-		int buff_length = modifiers.length();
+		int buff_length = modifiers_sb.length();
 		if (buff_length != 0) 
-			modifiers.delete(buff_length-2, buff_length);
+			modifiers_sb.delete(buff_length-2, buff_length);
 		
 		
-		return modifiers.toString();
+		return modifiers_sb.toString();
 	}
 	
 }
