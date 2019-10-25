@@ -12,38 +12,10 @@ public class Inspector {
 			
 	}
 	
-	private void inspect_with_tab_level_boring(Object obj, Class obj_class, boolean recursive, int tab_level) {
-		
-		// Base case: we have reached past the Object Class
-		if (obj == null) {
-			return;
-		}
-		
-		// indentation for our current recursion level
-		String indent = new String(new char[tab_level]).replace("\0", "\t");
-		
-		// print class name
-		System.out.println(indent + "Class name: " + obj_class.getName() + "\n");
-		
-		// recurse on super class
-		Class superclass = obj_class.getSuperclass();
-		if (superclass != null) {
-			inspect_with_tab_level_boring(obj, superclass, recursive, tab_level+1);
-		} else {
-			System.out.println(indent + "None\n");
-		}
-		
-		
-	}
-	
-	private String boring_inspect(Object obj, Class obj_class) {
-		StringBuilder sb = new StringBuilder();
-	}
-	
 	private void inspect_with_tab_level(Object obj, Class obj_class, boolean recursive, int tab_level) {
 		
 		// Base case: we have reached past the Object Class
-		if (obj == null) {
+		if (obj == null || obj_class == null) {
 			return;
 		}
 		
@@ -51,15 +23,15 @@ public class Inspector {
 		String indent = new String(new char[tab_level]).replace("\0", "\t");
 		
 		// print class name
-		System.out.println(indent + "Class name: " + obj_class.getName() + "\n");
-				
+		System.out.print(indent + "Class name: " + obj_class.getName() + "\n\n");
+		
 		// recurse on super class
-		Class superclass = obj_class.getSuperclass();
 		System.out.println(indent + "Super-Class");
+		Class superclass = obj_class.getSuperclass();
 		if (superclass != null) {
 			inspect_with_tab_level(obj, superclass, recursive, tab_level+1);
 		} else {
-			System.out.println(indent + "None\n");
+			System.out.print(indent + "None\n\n");
 		}
 		
 		// recurse on interfaces
@@ -70,38 +42,62 @@ public class Inspector {
 				inspect_with_tab_level(anInterface, anInterface, recursive, tab_level+1);
 			}	
 		} else {
-			System.out.println(indent + "None\n");
+			System.out.print(indent + "None\n\n");
 		}
 		
-		// print constructors 
-		System.out.println(indent + "Constructors");
-		String constructors_info = get_constructors_info(obj_class);
-		if (!constructors_info.isEmpty()) {
-			constructors_info = constructors_info.replaceAll("(?m)^", indent); 		// adds in the indentation
-			System.out.print(constructors_info);
-		} else {
-			System.out.println(indent + "None\n");
-		}
+		// print out class name, constructors and methods information
+		String basic_class_info = basic_inspect(obj, obj_class);
+		basic_class_info = basic_class_info.replaceAll("(?m)^", indent); 		// adds in the indentation
+		System.out.print(basic_class_info);
 		
-		
-		// print methods 
-		System.out.println(indent + "Methods");
-		String methods_info = get_declared_methods_info(obj_class);
-		if (!methods_info.isEmpty()) {
-			methods_info = methods_info.replaceAll("(?m)^", indent);				// adds in the indentation
-			System.out.print(methods_info);
-		} else {
-			System.out.println(indent + "None\n");
-		}
-		
-		// print fields 
+		// print out fields
+		// recurse if needed
+		Field[] obj_fields = obj_class.getDeclaredFields();
 		System.out.println(indent + "Fields");
-		String field_info = get_field_info(obj, obj_class, recursive, tab_level);
+		
+		if (obj_fields.length > 0) {
+			for (Field aField : obj_fields) {
+				String field_info = get_field_info(obj, aField);
+				field_info = field_info.replaceAll("(?m)^", indent); 		// adds in the indentation
+				System.out.print(field_info);
+				
+				// recurse if needed
+				// inspect the field objects
+				if (recursive && !aField.getType().isPrimitive()) {
+					
+					Object field_value = null;
+					try {
+						field_value = aField.get(obj);
+						
+					} catch (Exception e) {
+						System.out.println("Retrieving Field value exception - THIS SHOULD NOT HAPPEN");
+					}
+						
+					if (field_value != null ) {
+						
+						Class field_value_class = null;
+						if (field_value instanceof Class) {
+							field_value_class = (Class)field_value;;
+						} else {
+							field_value_class = field_value.getClass();
+						}
+						inspect_with_tab_level(field_value, field_value_class, recursive, tab_level+1);
+					} 
+				}
+			}
+		} else {
+			System.out.print(indent + "None\n\n");
+		}
 		
 		
+		// recurse on arrays
 		// check for array
 		if (obj_class.isArray()) {
-			System.out.println(indent + "Array Contents");
+			System.out.println(indent + "Array Info");
+			String array_info = get_array_info(obj);
+			array_info = array_info.replaceAll("(?m)^", indent); 		// adds in the indentation
+			System.out.print(array_info);
+			
 			// loop through the array
 			for (int i=0; i<Array.getLength(obj); i++) {
 				Object array_obj = Array.get(obj, i);
@@ -113,8 +109,48 @@ public class Inspector {
 				}
 			}
 		} 
+	}
+	
+	private String basic_inspect(Object obj, Class obj_class) {
+		StringBuilder sb = new StringBuilder();
 		
-	}	
+		// insert constructors 
+		sb.append("Constructors\n");
+		String constructors_info = get_constructors_info(obj_class);
+		if (!constructors_info.isEmpty()) {
+			sb.append(constructors_info);
+		} else {
+			sb.append("None\n\n");
+		}
+		
+		// insert methods 
+		sb.append("Methods\n");
+		String methods_info = get_declared_methods_info(obj_class);
+		if (!methods_info.isEmpty()) {
+			sb.append(methods_info);
+		} else {
+			sb.append("None\n\n");
+		}
+		
+		return sb.toString();
+	}
+	
+	private String get_array_info(Object array_obj) {
+		
+		// ensure arrray object is an actual array
+		Class array_class = array_obj.getClass();
+		if (!array_class.isArray()) return "";
+		
+		StringBuilder sb = new StringBuilder();
+		int arr_length = Array.getLength(array_obj);
+		sb.append(String.format("Array Length: %d\n", arr_length));
+		
+		String array_type = array_class.getComponentType().getTypeName();
+		sb.append(String.format("Array Type: %s\n", array_type));
+		
+		
+		return sb.toString();
+	}
 	
 	
 	private String get_field_info(Object obj, Field aField) {
@@ -169,83 +205,6 @@ public class Inspector {
 	}
 	
 	
-	private String get_field_info(Object obj, Class obj_class, boolean recursive, int tab_level) {
-		
-		Field[] obj_fields = obj_class.getDeclaredFields();
-		StringBuilder sb = new StringBuilder();
-		
-		String indent = new String(new char[tab_level]).replace("\0", "\t");
-		for (Field aField : obj_fields) {
-			
-			if (!aField.isAccessible()) {
-				aField.setAccessible(true);
-			}
-			
-			// print name
-			String field_name = aField.getName();
-			sb.append(String.format(indent + "Field Name: %s\n", field_name));
-			
-			// print type
-			Class field_type = aField.getType();
-			sb.append(String.format(indent + "Field Type : %s\n", field_type.getTypeName()));
-				
-			// print modifiers
-			String field_modifiers = get_modifiers(aField);
-			sb.append(String.format(indent + "Field Modifiers: %s\n", field_modifiers));
-			
-			// print current value
-			String value = null;
-			Object field_value = null;
-			boolean except_flag = false;
-			try {
-				field_value = aField.get(obj);
-				
-			} catch (IllegalAccessException iae) {
-				value = "IllegalAccessException thrown";
-			} catch (IllegalArgumentException iae) {
-				value = "IllegalArgumentException thrown";
-
-			} catch (NullPointerException npe) {
-				value = "NullPointerException thrown";
-
-			}
-			if (field_value != null ) {
-				if (!field_type.isPrimitive()) {
-					sb.append(String.format(indent + "Current Value: %s\n", field_value.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(field_value))));
-				} else {
-					sb.append(String.format(indent + "Current Value: %s\n", field_value));
-				}
-			} else {
-				sb.append(String.format(indent + "Current Value: %s\n", value));	
-			}
-			System.out.println(sb.toString());
-			sb = new StringBuilder();
-			
-			// recurse
-			if (recursive  && field_value != null) {
-				
-				if (!field_type.isPrimitive()) {
-					Class field_value_class = null;
-					if (field_value instanceof Class) {
-						field_value_class = (Class)field_value;;
-					} else {
-						field_value_class = field_value.getClass();
-					}
-					inspect_with_tab_level(field_value, field_value_class, recursive, tab_level+1);
-				}
-				
-			}
-			
-		}
-		
-		if (obj_fields.length == 0) {
-			System.out.println(indent + "None\n");
-		}
-		
-
-		return sb.toString();
-	}
-	
 	/**
 	 * prints the constructors of a class obj
 	 * @param class_obj : Class object containing the constructors
@@ -266,7 +225,9 @@ public class Inspector {
 						
 			// print parameter types
 			String parameter_types = classArrayToString(aConstructor.getParameterTypes(), ", ");
-		
+			if (parameter_types.isEmpty()) {
+				parameter_types = "None";
+			} 
 			sb.append(String.format("Parameter Types: %s\n", parameter_types));
 			
 			// print possible modifiers
