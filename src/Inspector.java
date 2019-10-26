@@ -41,9 +41,10 @@ public class Inspector {
 		// indentation for our current recursion level
 		String indent = new String(new char[tab_level]).replace("\0", "\t");
 		
-		// print class name
+		// print object name
 		String class_name = obj_class.getName();
-		System.out.print(indent + "Class name: " + class_name + "\n\n");
+		String object_title = obj_class.isInterface()? "Interface Name: " : "Class Name: ";
+		System.out.print(indent + object_title + class_name + "\n\n");
 		
 		// recurse on super class
 		System.out.println(indent + "Super-Class (" + class_name + ")");
